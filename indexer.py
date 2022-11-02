@@ -1,14 +1,21 @@
 import os
 import json
-from bs4 import BeautifulSoup
 import re
+from bs4 import BeautifulSoup
+from nltk.stem import PorterStemmer
+from collections import namedtuple
+
 
 DOC_ID = 0
 
 DOC_ID_URL_MAP = {}
 
+POSTING = namedtuple("POSTING", ["docid", "freq"])
+
 def build_index(root_dir):
     global DOC_ID
+
+    inverted_index = {}
 
     corpus = os.listdir(root_dir)
     for f in corpus:
@@ -16,15 +23,30 @@ def build_index(root_dir):
         if os.path.isdir(file):
             pages = os.listdir(file)
             for p in pages:
-                
-                json_file = open(os.path.join(file, p), "r")
-                data = json.load(json_file)
-                json_file.close()
+                try:
+                    with open(os.path.join(file, p), "r") as json_file:
+                        data = json.load(json_file)
 
-                id = assign_docid_to_url(data["url"])
-                soup = BeautifulSoup(data["content"], "html.parser")
-                tokens = tokenize(soup.get_text())
-                token_frequency = compute_token_frequencies(tokens)
+                    id = assign_docid_to_url(data["url"])
+                    soup = BeautifulSoup(data["content"], "html.parser")
+                    tokens = tokenize(soup.get_text())
+                    ps = PorterStemmer()
+                    tokens = [ps.stem(token) for token in tokens]
+                    token_frequencies = compute_token_frequencies(tokens)
+                    add_postings(id, token_frequencies, inverted_index)
+                except:
+                    print("Something wrong with opening file " + p)
+    with open("index.json", "w") as outfile:
+        json.dump(inverted_index, outfile)
+
+
+def add_postings(id, token_frequencies, inverted_index):
+    for token in token_frequencies:
+        posting = POSTING(id, token_frequencies[token])
+        if token not in inverted_index:
+            inverted_index[token] = [posting]
+        else:
+            inverted_index[token].append(posting)
 
 def assign_docid_to_url(url):
     global DOC_ID
