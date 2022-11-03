@@ -1,3 +1,4 @@
+from cgi import print_form
 import os
 import json
 import re
@@ -23,6 +24,7 @@ def build_index(root_dir):
         if os.path.isdir(file):
             pages = os.listdir(file)
             for p in pages:
+                print("p")
                 try:
                     with open(os.path.join(file, p), "r") as json_file:
                         data = json.load(json_file)
@@ -36,6 +38,7 @@ def build_index(root_dir):
                     add_postings(id, token_frequencies, inverted_index)
                 except:
                     print("Something wrong with opening file " + p)
+                    
     with open("index.json", "w") as outfile:
         json.dump(inverted_index, outfile)
 
