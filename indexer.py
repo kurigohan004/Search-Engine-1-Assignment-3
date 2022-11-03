@@ -1,4 +1,3 @@
-from cgi import print_form
 import os
 import json
 import re
@@ -15,6 +14,7 @@ POSTING = namedtuple("POSTING", ["docid", "freq"])
 
 def build_index(root_dir):
     global DOC_ID
+    global DOC_ID_URL_MAP 
 
     inverted_index = {}
 
@@ -24,7 +24,7 @@ def build_index(root_dir):
         if os.path.isdir(file):
             pages = os.listdir(file)
             for p in pages:
-                print("p")
+                print(DOC_ID)
                 try:
                     with open(os.path.join(file, p), "r") as json_file:
                         data = json.load(json_file)
@@ -38,10 +38,16 @@ def build_index(root_dir):
                     add_postings(id, token_frequencies, inverted_index)
                 except:
                     print("Something wrong with opening file " + p)
-                    
+
     with open("index.json", "w") as outfile:
         json.dump(inverted_index, outfile)
 
+    with open("DocID_map.json", "w") as outfile:
+        json.dump(DOC_ID_URL_MAP, outfile)
+
+    print("Number of documents: " + len(DOC_ID_URL_MAP))
+    print("The number of unique tokens: " + len(inverted_index))
+    print("Size of index in kb:" + os.path.getsize("index.json")/1024)
 
 def add_postings(id, token_frequencies, inverted_index):
     for token in token_frequencies:
@@ -80,3 +86,5 @@ def compute_token_frequencies(tokens):
             token_frequencies[token] += 1
     return token_frequencies
 
+if __name__ == "__main__":
+    build_index("DEV")
