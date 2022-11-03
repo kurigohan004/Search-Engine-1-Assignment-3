@@ -76,3 +76,4 @@ def compute_token_frequencies(tokens):
         else:
             token_frequencies[token] += 1
     return token_frequencies
+

@@ -12,4 +12,4 @@ def create_report(inv_index): #might need to change
 
 
 if __name__ == "__main__":
-    pass
+    build_index("DEV")
