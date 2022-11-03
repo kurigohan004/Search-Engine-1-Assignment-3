@@ -45,9 +45,10 @@ def build_index(root_dir):
     with open("DocID_map.json", "w") as outfile:
         json.dump(DOC_ID_URL_MAP, outfile)
 
-    print("Number of documents: " + len(DOC_ID_URL_MAP))
-    print("The number of unique tokens: " + len(inverted_index))
-    print("Size of index in kb:" + os.path.getsize("index.json")/1024)
+    print(f"Number of documents: {len(DOC_ID_URL_MAP)}")
+    print(f"The number of unique tokens: {len(inverted_index)}")
+    size_in_bytes = os.path.getsize("index.json")
+    print(f"Size of index in kb: {(size_in_bytes/1024)}")
 
 def add_postings(id, token_frequencies, inverted_index):
     for token in token_frequencies:
