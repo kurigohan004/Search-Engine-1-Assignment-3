@@ -3,7 +3,6 @@ import json
 import re
 from bs4 import BeautifulSoup
 from nltk.stem import PorterStemmer
-from collections import namedtuple
 
 
 DOC_ID = 0
@@ -161,8 +160,8 @@ def get_sz_idx():
     return os.path.getsize(os.path.join("Merge", "full_index.txt")) / 1024
 
 if __name__ == "__main__":
-    #build_index("DEV")
-    #merge_partial_indices()
+    build_index("DEV")
+    merge_partial_indices()
     print(f"Number of documents: {get_num_docs()}")
     print(f"The number of unique tokens: {get_num_unq_toks()}")
     print(f"Size of index in kb: {get_sz_idx()}")
