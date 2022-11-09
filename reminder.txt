@@ -1,1 +1,0 @@
-Talk about implementation of index for index and some changes
