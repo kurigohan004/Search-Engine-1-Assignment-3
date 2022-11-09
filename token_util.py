@@ -1,4 +1,6 @@
 import re
+from nltk.stem import PorterStemmer
+
 
 def tokenize(text):
     text = text.lower()
@@ -9,6 +11,8 @@ def tokenize(text):
     while r >= 0 and not ("a" <= text[r] <= "z" or "0" <= text[r] <= "9"):
         r -= 1
     tokens = re.split(r"[^a-z0-9]+", text[l:r+1])
+    ps = PorterStemmer()
+    tokens = [ps.stem(token) for token in tokens]
     return [token for token in tokens if token != ""]
 
 def compute_token_frequencies(tokens):

@@ -2,7 +2,6 @@ import os
 import json
 import math
 from bs4 import BeautifulSoup
-from nltk.stem import PorterStemmer
 from token_util import tokenize, compute_token_frequencies
 
 
@@ -31,8 +30,6 @@ def build_index(root_dir):
                     id = assign_docid_to_url(data["url"])
                     soup = BeautifulSoup(data["content"], "html.parser")
                     tokens = tokenize(soup.get_text())
-                    ps = PorterStemmer()
-                    tokens = [ps.stem(token) for token in tokens]
                     token_frequencies = compute_token_frequencies(tokens)
                     important_tokens = get_important_tokens(soup)
                     add_postings(id, tokens, token_frequencies, important_tokens, inverted_index)
@@ -60,9 +57,7 @@ def get_important_tokens(soup):
     important_tokens = set()
     for tags in soup.find_all(["b", "h1", "h2", "h3", "title"]):
         text = tags.text.strip()
-        ps = PorterStemmer()
         tokens = tokenize(text)
-        tokens = [ps.stem(token) for token in tokens]
         important_tokens.update(tokens)
     return important_tokens
 
