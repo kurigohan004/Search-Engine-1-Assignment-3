@@ -1,8 +1,9 @@
 import os
 import json
-import re
+import math
 from bs4 import BeautifulSoup
 from nltk.stem import PorterStemmer
+from token_util import tokenize, compute_token_frequencies
 
 
 DOC_ID = 0
@@ -34,8 +35,8 @@ def build_index(root_dir):
                     tokens = [ps.stem(token) for token in tokens]
                     token_frequencies = compute_token_frequencies(tokens)
                     important_tokens = get_important_tokens(soup)
-                    add_postings(id, token_frequencies, important_tokens, inverted_index)
-                    if DOC_ID % 10000 == 0:
+                    add_postings(id, tokens, token_frequencies, important_tokens, inverted_index)
+                    if DOC_ID % 15000 == 0:
                         print(f"Offloading inverted index into p_index{OFFLOAD_COUNTER}.txt")
                         offload_index(inverted_index)
         
@@ -43,7 +44,7 @@ def build_index(root_dir):
         print(f"Offloading inverted index into p_index{OFFLOAD_COUNTER}.txt")
         offload_index(inverted_index)
 
-    with open("DocID_map.json", "w") as outfile:
+    with open(os.path.join("Auxilary", "DocID_map.json"), "w") as outfile:
         json.dump(DOC_ID_URL_MAP, outfile)
 
 def assign_docid_to_url(url):
@@ -55,26 +56,6 @@ def assign_docid_to_url(url):
     DOC_ID_URL_MAP[id] = url
     return id
 
-def tokenize(text):
-    text = text.lower()
-    l = 0
-    while l < len(text) and not ("a" <= text[l] <= "z" or "0" <= text[l] <= "9"):
-        l += 1
-    r = len(text)-1
-    while r >= 0 and not ("a" <= text[r] <= "z" or "0" <= text[r] <= "9"):
-        r -= 1
-    tokens = re.split(r"[^a-z0-9]+", text[l:r+1])
-    return [token for token in tokens if token != ""]
-
-def compute_token_frequencies(tokens):
-    token_frequencies = {}
-    for token in tokens:
-        if token not in token_frequencies:
-            token_frequencies[token] = 1
-        else:
-            token_frequencies[token] += 1
-    return token_frequencies
-
 def get_important_tokens(soup):
     important_tokens = set()
     for tags in soup.find_all(["b", "h1", "h2", "h3", "title"]):
@@ -85,9 +66,10 @@ def get_important_tokens(soup):
         important_tokens.update(tokens)
     return important_tokens
 
-def add_postings(id, token_frequencies, important_tokens, inverted_index):
+def add_postings(id, tokens, token_frequencies, important_tokens, inverted_index):
     for token in token_frequencies:
-        posting = (id, token_frequencies[token], token in important_tokens)
+        tf = f"{token_frequencies[token]}/{len(tokens)}"
+        posting = (id, tf, token in important_tokens)
         if token not in inverted_index:
             inverted_index[token] = [posting]
         else:
@@ -98,7 +80,7 @@ def offload_index(inverted_index):
     address = os.path.join("Partial", f"p_index{OFFLOAD_COUNTER}.txt")
     with open(address, "w") as outfile:
         for token, lst in sorted(inverted_index.items()):
-            outfile.write(token + ":" + str(lst) + "\n")
+            outfile.write((token + ":" + str(lst)).replace(" ", "") + "\n")
         inverted_index.clear()
         OFFLOAD_COUNTER += 1
 
@@ -138,16 +120,33 @@ def merge_partial_indices():
                         line2 = file2.readline()
                     else:
                         val1.extend(val2)
-                        outfile.write(key1 + ":" + str(val1) + "\n")
+                        outfile.write((key1 + ":" + str(val1)).replace(" ", "") + "\n")
                         line1 = file1.readline()
                         line2 = file2.readline()
+        os.remove(os.path.join("Merge", other_file))
+
+def index_the_index():
+    index_for_index = {}
+
+    with open(os.path.join("Merge", "full_index.txt"), "r") as file:
+        while True:
+            pos = file.tell()
+            line = file.readline()
+            if len(line) == 0:
+                break
+            else:
+                token = line.split(":")[0]
+                index_for_index[token] = pos
+
+    with open(os.path.join("Auxilary", "index_for_index.json"), "w") as outfile:
+        json.dump(index_for_index, outfile)
 
 def get_num_docs():
     return len(DOC_ID_URL_MAP)
 
 def get_num_unq_toks():
     num_toks = 0
-    with open(os.path.join("Merge", "full_index.txt")) as file:
+    with open(os.path.join("Merge", "full_index.txt"), "r") as file:
         while True:
             line = file.readline()
             if len(line) == 0:
@@ -162,6 +161,8 @@ def get_sz_idx():
 if __name__ == "__main__":
     build_index("DEV")
     merge_partial_indices()
+    index_the_index()
     print(f"Number of documents: {get_num_docs()}")
     print(f"The number of unique tokens: {get_num_unq_toks()}")
     print(f"Size of index in kb: {get_sz_idx()}")
+    
