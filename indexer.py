@@ -32,7 +32,7 @@ def build_index(root_dir):
                     tokens = tokenize(soup.get_text())
                     token_frequencies = compute_token_frequencies(tokens)
                     important_tokens = get_important_tokens(soup)
-                    add_postings(id, tokens, token_frequencies, important_tokens, inverted_index)
+                    add_postings(id, token_frequencies, important_tokens, inverted_index)
                     if DOC_ID % 15000 == 0:
                         print(f"Offloading inverted index into p_index{OFFLOAD_COUNTER}.txt")
                         offload_index(inverted_index)
@@ -61,10 +61,9 @@ def get_important_tokens(soup):
         important_tokens.update(tokens)
     return important_tokens
 
-def add_postings(id, tokens, token_frequencies, important_tokens, inverted_index):
+def add_postings(id, token_frequencies, important_tokens, inverted_index):
     for token in token_frequencies:
-        tf = f"{token_frequencies[token]}/{len(tokens)}"
-        posting = (id, tf, token in important_tokens)
+        posting = (id, token_frequencies[token], token in important_tokens)
         if token not in inverted_index:
             inverted_index[token] = [posting]
         else:
