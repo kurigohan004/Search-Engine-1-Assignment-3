@@ -55,7 +55,7 @@ def assign_docid_to_url(url):
 
 def get_important_tokens(soup):
     important_tokens = set()
-    for tags in soup.find_all(["b", "h1", "h2", "h3", "title"]):
+    for tags in soup.find_all(["strong", "b", "h1", "h2", "h3", "title"]):
         text = tags.text.strip()
         tokens = tokenize(text)
         important_tokens.update(tokens)
