@@ -3,6 +3,7 @@ import json
 import math
 from bs4 import BeautifulSoup
 from token_util import tokenize, compute_token_frequencies
+from score_util import compute_tf_idf
 
 
 DOC_ID = 0
@@ -10,6 +11,11 @@ DOC_ID = 0
 DOC_ID_URL_MAP = {}
 
 OFFLOAD_COUNTER = 0
+
+# posting = (docid, tf, imp)
+DOCID = 0
+TF = TFIDF = 1
+IMP = 2
 
 def build_index(root_dir):
     global DOC_ID
@@ -119,10 +125,10 @@ def merge_partial_indices():
                         line2 = file2.readline()
         os.remove(os.path.join("Merge", other_file))
 
-def index_the_index():
+def index_the_index(filename):
     index_for_index = {}
 
-    with open(os.path.join("Merge", "full_index.txt"), "r") as file:
+    with open(os.path.join("Merge", filename), "r") as file:
         while True:
             pos = file.tell()
             line = file.readline()
@@ -135,12 +141,51 @@ def index_the_index():
     with open(os.path.join("Auxilary", "index_for_index.json"), "w") as outfile:
         json.dump(index_for_index, outfile)
 
+def convert_freq_to_norm_tf_idf(source_filename, intermediate_filename, target_filename):
+    doc_lengs_for_normalize = {}
+    with open(os.path.join("Merge", source_filename), "r") as s_file, open(os.path.join("Merge", intermediate_filename), "w") as i_file:
+        line = s_file.readline()
+        while len(line) != 0:
+            new_posting_list = []
+            entry = line.split(":")
+            key = entry[0]
+            val = eval(entry[1].strip())
+            for posting in val:
+                tf_idf = compute_tf_idf(posting[TF], None, lambda tf: 1+math.log10(tf), lambda df: 1) #lnc
+                if posting[DOCID] not in doc_lengs_for_normalize:
+                    doc_lengs_for_normalize[posting[DOCID]] = tf_idf ** 2
+                else:
+                    doc_lengs_for_normalize[posting[DOCID]] += tf_idf ** 2
+                decimal_limited_tf_idf = (tf_idf * 10000) // 1 / 10000
+                new_posting = (posting[DOCID], decimal_limited_tf_idf, posting[IMP])
+                new_posting_list.append(new_posting)
+            i_file.write((key + ":" + str(new_posting_list)).replace(" ", "") + "\n")
+            line = s_file.readline()
+    for docid in doc_lengs_for_normalize:
+        doc_lengs_for_normalize[docid] = math.sqrt(doc_lengs_for_normalize[docid])
+    with open(os.path.join("Merge", intermediate_filename), "r") as i_file, open(os.path.join("Merge", target_filename), "w") as t_file:
+        line = i_file.readline()
+        while len(line) != 0:
+            new_posting_list = []
+            entry = line.split(":")
+            key = entry[0]
+            val = eval(entry[1].strip())
+            for posting in val:
+                norm_tf_idf = posting[TFIDF] / doc_lengs_for_normalize[posting[DOCID]]
+                decimal_limited_norm_tf_idf = (norm_tf_idf * 10000) // 1 / 10000
+                new_posting = (posting[DOCID], decimal_limited_norm_tf_idf, posting[IMP])
+                new_posting_list.append(new_posting)
+            t_file.write((key + ":" + str(new_posting_list)).replace(" ", "") + "\n")
+            line = i_file.readline()
+    with open(os.path.join("Auxilary", "doc_lengs_for_normalize.json"), "w") as outfile:
+        json.dump(doc_lengs_for_normalize, outfile)
+
 def get_num_docs():
     return len(DOC_ID_URL_MAP)
 
-def get_num_unq_toks():
+def get_num_unq_toks(filename):
     num_toks = 0
-    with open(os.path.join("Merge", "full_index.txt"), "r") as file:
+    with open(os.path.join("Merge", filename), "r") as file:
         while True:
             line = file.readline()
             if len(line) == 0:
@@ -149,14 +194,15 @@ def get_num_unq_toks():
                 num_toks += 1
     return num_toks
 
-def get_sz_idx():
-    return os.path.getsize(os.path.join("Merge", "full_index.txt")) / 1024
+def get_sz_idx(filename):
+    return os.path.getsize(os.path.join("Merge", filename)) / 1024
 
 if __name__ == "__main__":
-    build_index("DEV")
-    merge_partial_indices()
-    index_the_index()
+    #build_index("DEV")
+    #merge_partial_indices()
+    convert_freq_to_norm_tf_idf("full_index.txt", "intermediate_full_index.txt", "final_full_index.txt")
+    index_the_index("final_full_index.txt")
     print(f"Number of documents: {get_num_docs()}")
-    print(f"The number of unique tokens: {get_num_unq_toks()}")
-    print(f"Size of index in kb: {get_sz_idx()}")
+    print(f"The number of unique tokens: {get_num_unq_toks('final_full_index.txt')}")
+    print(f"Size of index in kb: {get_sz_idx('final_full_index.txt')}")
     
