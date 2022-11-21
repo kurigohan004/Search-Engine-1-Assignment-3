@@ -61,10 +61,11 @@ def get_docs_and_scores(all_query_postings, query_norm_tf_idfs):
     docs_and_scores = {}
     for i in range(len(all_query_postings)):
         for posting in all_query_postings[i][1]:
+            imp_factor = 1 if posting[IMP] else (1/3)
             if posting[DOCID] not in docs_and_scores:
-                docs_and_scores[posting[DOCID]] = posting[SCORE] * query_norm_tf_idfs[i]
+                docs_and_scores[posting[DOCID]] = posting[SCORE] * query_norm_tf_idfs[i] * imp_factor
             else:
-                docs_and_scores[posting[DOCID]] += posting[SCORE] * query_norm_tf_idfs[i]
+                docs_and_scores[posting[DOCID]] += posting[SCORE] * query_norm_tf_idfs[i] * imp_factor
     return docs_and_scores
 
 def serve_query(query_token_frequencies, index_file, index_for_index):
@@ -87,14 +88,19 @@ def serve_query(query_token_frequencies, index_file, index_for_index):
     query_norm_tf_idfs = [tf_idf/query_leng_for_normalize for tf_idf in query_tf_idfs]
     docs_and_scores = get_docs_and_scores(all_query_postings, query_norm_tf_idfs)
     result = sorted([docs for docs in docs_and_scores], key = lambda x: docs_and_scores[x], reverse = True)
-    for i in range(5):
-        print(result[i])
+    if len(docs_and_scores) >= 5:
+        for i in range(5):
+            print(docs_and_scores[result[i]])
+
     return result
 
 def print_top_5(doc_ids, doc_id_url_map):
-    for i, doc_id in enumerate(doc_ids[:5]):
-        url = doc_id_url_map[str(doc_id)]
-        print(f"{i+1}. {url}")
+    if len(doc_ids) == 0:
+        print("No results found")
+    else:
+        for i, doc_id in enumerate(doc_ids[:5]):
+            url = doc_id_url_map[str(doc_id)]
+            print(f"{i+1}. {url}")
 
 if __name__ == "__main__":
     with open(os.path.join("Auxilary", "DocID_map.json"), "r") as file:
@@ -103,8 +109,8 @@ if __name__ == "__main__":
         index_for_index = json.load(file)
     with open(os.path.join("Merge", "final_full_index.txt"), "r") as file:
         while True:
-            start_time = time.time()
             query = input("Enter a query: ")
+            start_time = time.time()
             if len(query) != 0:
                 query_tokens = tokenize(query)
                 query_token_frequencies = compute_token_frequencies(query_tokens)
@@ -113,5 +119,5 @@ if __name__ == "__main__":
             else:
                 break
             end_time = time.time()
-            resp_time = (end_time-start_time) / 1000
+            resp_time = (end_time-start_time) * 1000
             print(f"Response time to query was {resp_time} ms.")
