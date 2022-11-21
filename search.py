@@ -2,6 +2,7 @@ import os
 import json
 import time
 import math
+import heapq
 from token_util import tokenize, compute_token_frequencies
 from score_util import compute_tf_idf
 
@@ -57,6 +58,18 @@ def serve_query(query_tokens, index_file, index_for_index):
         return [x[DOCID] for x in intersection]
 """
 
+def get_top_5_queries_from_docs_and_scores(docs_and_scores):
+    SCORE = 0 #maxes indexing cleaner
+    heap = [] #initialize empty heapq
+    for docid, score in docs_and_scores.items():
+        if len(heap)<5: # if there are not 5 element in heapq, just add them 
+            heapq.heappush(heap, (score, docid))
+        else:
+            # if current docid score is larger, then remove lowest score and add this one 
+            if score > heap[0][SCORE]:
+                heapq.heappushpop(heap, (score, docid)) # faster than doing separate push and then pop operations
+    return heap
+
 def get_docs_and_scores(all_query_postings, query_norm_tf_idfs):
     docs_and_scores = {}
     for i in range(len(all_query_postings)):
@@ -80,27 +93,25 @@ def serve_query(query_token_frequencies, index_file, index_for_index):
             postings = eval(postings)
             all_query_postings.append((term, postings))
 
-            tf_idf = compute_tf_idf(freq, len(postings), lambda tf: 1+math.log10(tf), lambda df: math.log10(N/df)) #ltc
+            tf_idf = compute_tf_idf(freq, len(postings), lambda tf: 1+math.log10(tf), lambda df: math.log10(N/df)) #ltc #can consider limiting to terms with high idf only
             query_tf_idfs.append(tf_idf)
             query_leng_for_normalize += tf_idf ** 2
     
     query_leng_for_normalize = math.sqrt(query_leng_for_normalize)
     query_norm_tf_idfs = [tf_idf/query_leng_for_normalize for tf_idf in query_tf_idfs]
     docs_and_scores = get_docs_and_scores(all_query_postings, query_norm_tf_idfs)
-    result = sorted([docs for docs in docs_and_scores], key = lambda x: docs_and_scores[x], reverse = True)
-    if len(docs_and_scores) >= 5:
-        for i in range(5):
-            print(docs_and_scores[result[i]])
-
+    result = get_top_5_queries_from_docs_and_scores(docs_and_scores)
     return result
 
-def print_top_5(doc_ids, doc_id_url_map):
-    if len(doc_ids) == 0:
+def print_top_5(results, doc_id_url_map):
+    if len(results) == 0:
         print("No results found")
     else:
-        for i, doc_id in enumerate(doc_ids[:5]):
-            url = doc_id_url_map[str(doc_id)]
-            print(f"{i+1}. {url}")
+        i = 0
+        for item in heapq.nlargest(5, results):
+            print(f"{i+1}. {doc_id_url_map[str(item[1])]}")
+            i += 1
+    
 
 if __name__ == "__main__":
     with open(os.path.join("Auxilary", "DocID_map.json"), "r") as file:
@@ -114,8 +125,8 @@ if __name__ == "__main__":
             if len(query) != 0:
                 query_tokens = tokenize(query)
                 query_token_frequencies = compute_token_frequencies(query_tokens)
-                doc_ids = serve_query(query_token_frequencies, file, index_for_index)
-                print_top_5(doc_ids, doc_id_url_map)
+                results = serve_query(query_token_frequencies, file, index_for_index)
+                print_top_5(results, doc_id_url_map)
             else:
                 break
             end_time = time.time()
