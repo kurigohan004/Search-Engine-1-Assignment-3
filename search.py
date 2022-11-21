@@ -3,6 +3,7 @@ import json
 import time
 import math
 import heapq
+import ast
 from token_util import tokenize, compute_token_frequencies
 from score_util import compute_tf_idf
 
@@ -57,6 +58,32 @@ def serve_query(query_tokens, index_file, index_for_index):
         # do more
         return [x[DOCID] for x in intersection]
 """
+def convert_str_to_postings(postings_str):
+    postings = []
+    curr_posting = [0,0,0]
+    curr_posting_idx = 0
+    curr_val = ""
+    for ch in postings_str:
+        if ch == "[" or ch == "]":
+            pass
+        elif ch == "(":
+            curr_posting = [0,0,0]
+            curr_posting_idx = 0
+            curr_val = ""
+        elif ch == ",":
+            if curr_posting_idx == 0:
+                curr_posting[curr_posting_idx] = int(curr_val)
+            elif curr_posting_idx == 1:
+                curr_posting[curr_posting_idx] = float(curr_val)
+            curr_posting_idx += 1
+            curr_val = ""
+        elif ch == ")":
+            curr_posting[curr_posting_idx] = int(curr_val)
+            postings.append(tuple(curr_posting))
+        else:
+            curr_val += ch
+    return postings
+    
 
 def get_top_5_queries_from_docs_and_scores(docs_and_scores):
     SCORE = 0 #maxes indexing cleaner
@@ -90,13 +117,11 @@ def serve_query(query_token_frequencies, index_file, index_for_index):
             index_file.seek(index_for_index[token])
             line = index_file.readline().strip()
             term, postings = line.split(":")
-            postings = eval(postings)
+            postings = convert_str_to_postings(postings)
             all_query_postings.append((term, postings))
-
             tf_idf = compute_tf_idf(freq, len(postings), lambda tf: 1+math.log10(tf), lambda df: math.log10(N/df)) #ltc #can consider limiting to terms with high idf only
             query_tf_idfs.append(tf_idf)
             query_leng_for_normalize += tf_idf ** 2
-    
     query_leng_for_normalize = math.sqrt(query_leng_for_normalize)
     query_norm_tf_idfs = [tf_idf/query_leng_for_normalize for tf_idf in query_tf_idfs]
     docs_and_scores = get_docs_and_scores(all_query_postings, query_norm_tf_idfs)

@@ -157,7 +157,7 @@ def convert_freq_to_norm_tf_idf(source_filename, intermediate_filename, target_f
                 else:
                     doc_lengs_for_normalize[posting[DOCID]] += tf_idf ** 2
                 decimal_limited_tf_idf = (tf_idf * 10000) // 1 / 10000
-                new_posting = (posting[DOCID], decimal_limited_tf_idf, posting[IMP])
+                new_posting = (posting[DOCID], decimal_limited_tf_idf, 1 if posting[IMP] else 0)
                 new_posting_list.append(new_posting)
             i_file.write((key + ":" + str(new_posting_list)).replace(" ", "") + "\n")
             line = s_file.readline()
