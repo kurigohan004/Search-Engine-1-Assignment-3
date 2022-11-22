@@ -71,9 +71,9 @@ def convert_str_to_postings(postings_str):
             curr_posting_idx = 0
             curr_val = ""
         elif ch == ",":
-            if curr_posting_idx == 0:
+            if curr_posting_idx == DOCID:
                 curr_posting[curr_posting_idx] = int(curr_val)
-            elif curr_posting_idx == 1:
+            elif curr_posting_idx == SCORE:
                 curr_posting[curr_posting_idx] = float(curr_val)
             curr_posting_idx += 1
             curr_val = ""
@@ -83,7 +83,14 @@ def convert_str_to_postings(postings_str):
         else:
             curr_val += ch
     return postings
-    
+
+def convert_str_to_postings2(postings_str):
+    postings_str = postings_str[2:len(postings_str)-2]
+    postings = postings_str.split("),(")
+    for i in range(len(postings)):
+        temp = postings[i].split(",")
+        postings[i] = (int(temp[DOCID]), float(temp[SCORE]), int(temp[IMP]))
+    return postings
 
 def get_top_5_queries_from_docs_and_scores(docs_and_scores):
     SCORE = 0 #maxes indexing cleaner
@@ -117,7 +124,7 @@ def serve_query(query_token_frequencies, index_file, index_for_index):
             index_file.seek(index_for_index[token])
             line = index_file.readline().strip()
             term, postings = line.split(":")
-            postings = convert_str_to_postings(postings)
+            postings = convert_str_to_postings2(postings)
             all_query_postings.append((term, postings))
             tf_idf = compute_tf_idf(freq, len(postings), lambda tf: 1+math.log10(tf), lambda df: math.log10(N/df)) #ltc #can consider limiting to terms with high idf only
             query_tf_idfs.append(tf_idf)
