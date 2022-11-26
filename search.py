@@ -108,7 +108,7 @@ def get_docs_and_scores(all_query_postings, query_norm_tf_idfs):
     docs_and_scores = {}
     for i in range(len(all_query_postings)):
         for posting in all_query_postings[i][1]:
-            imp_factor = 1 if posting[IMP] else (1/3)
+            imp_factor = 1 if posting[IMP] else (1/2)
             if posting[DOCID] not in docs_and_scores:
                 docs_and_scores[posting[DOCID]] = posting[SCORE] * query_norm_tf_idfs[i] * imp_factor
             else:
@@ -119,7 +119,11 @@ def serve_query(query_token_frequencies, index_file, index_for_index):
     all_query_postings = []
     query_tf_idfs = []
     query_leng_for_normalize = 0
-    for token, freq in query_token_frequencies.items():
+    if len(query_token_frequencies) <= 32:
+        query_items = query_token_frequencies.items()
+    else:
+        query_items = sorted(list(query_token_frequencies.items()), key = lambda item: len(item[0]), reverse = True)[:32]
+    for token, freq in query_items:
         if token in index_for_index:
             index_file.seek(index_for_index[token])
             line = index_file.readline().strip()
