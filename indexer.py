@@ -24,6 +24,7 @@ def build_index(root_dir):
 
     inverted_index = {}
 
+    # go through each folder in DEV folder and go through each json file in each of those folder
     corpus = os.listdir(root_dir)
     for f in corpus:
         file = os.path.join(root_dir, f)
@@ -32,11 +33,12 @@ def build_index(root_dir):
             for p in pages:
                 print(DOC_ID)
                 with open(os.path.join(file, p), "r") as json_file:
+                    # parse text to grab tokens and create postings
                     data = json.load(json_file)
-                    id = assign_docid_to_url(data["url"])
+                    id = assign_docid_to_url(data["url"]) # assigns document id to url
                     soup = BeautifulSoup(data["content"], "html.parser")
                     tokens = tokenize(soup.get_text())
-                    token_frequencies = compute_token_frequencies(tokens)
+                    token_frequencies = compute_token_frequencies(tokens) # checks which tokens are important
                     important_tokens = get_important_tokens(soup)
                     add_postings(id, token_frequencies, important_tokens, inverted_index)
                     if DOC_ID % 15000 == 0:
@@ -46,9 +48,11 @@ def build_index(root_dir):
     if len(inverted_index) != 0:
         print(f"Offloading inverted index into p_index{OFFLOAD_COUNTER}.txt")
         offload_index(inverted_index)
+    # should have 4 partial index after entire function
 
     with open(os.path.join("Auxilary", "DocID_map.json"), "w") as outfile:
         json.dump(DOC_ID_URL_MAP, outfile)
+    # dumps map of document id to url into json file to use later in search component
 
 def assign_docid_to_url(url):
     global DOC_ID
@@ -85,6 +89,7 @@ def offload_index(inverted_index):
         OFFLOAD_COUNTER += 1
 
 def merge_partial_indices():
+    # merges partial index two at a time, result is full_index.txt
     partial_indices = os.listdir("Partial")
     for i, f in enumerate(sorted(partial_indices)):
         merge_file = f"m_index{i}.txt" if i < len(partial_indices)-1 else "full_index.txt"
@@ -92,7 +97,7 @@ def merge_partial_indices():
         with open(os.path.join("Partial", f), "r") as file1, open(os.path.join("Merge", other_file), "r") as file2 , open(os.path.join("Merge", merge_file), "w") as outfile:
             line1 = file1.readline()
             line2 = file2.readline()
-            while True:
+            while True: # if posting exist in both files, we combine them
                 if len(line1) == 0 and len(line2) == 0:
                     break
                 elif len(line1) == 0:
@@ -126,6 +131,7 @@ def merge_partial_indices():
         os.remove(os.path.join("Merge", other_file))
 
 def index_the_index(filename):
+    # go through each line in final index file and mapping the term to position in file
     index_for_index = {}
 
     with open(os.path.join("Merge", filename), "r") as file:
@@ -151,8 +157,8 @@ def convert_freq_to_norm_tf_idf(source_filename, intermediate_filename, target_f
             key = entry[0]
             val = eval(entry[1].strip())
             for posting in val:
-                tf_idf = compute_tf_idf(posting[TF], None, lambda tf: 1+math.log10(tf), lambda df: 1) #lnc
-                if posting[DOCID] not in doc_lengs_for_normalize:
+                tf_idf = compute_tf_idf(posting[TF], None, lambda tf: 1+math.log10(tf), lambda df: 1) # calculated tf-idf using lnc
+                if posting[DOCID] not in doc_lengs_for_normalize: # accumulates length for each docid to use for normalization
                     doc_lengs_for_normalize[posting[DOCID]] = tf_idf ** 2
                 else:
                     doc_lengs_for_normalize[posting[DOCID]] += tf_idf ** 2
@@ -163,6 +169,7 @@ def convert_freq_to_norm_tf_idf(source_filename, intermediate_filename, target_f
             line = s_file.readline()
     for docid in doc_lengs_for_normalize:
         doc_lengs_for_normalize[docid] = math.sqrt(doc_lengs_for_normalize[docid])
+    # Result of first loop is an intermediate file with tf-idf, we then go through this intermediate file to normalize the tf-idf
     with open(os.path.join("Merge", intermediate_filename), "r") as i_file, open(os.path.join("Merge", target_filename), "w") as t_file:
         line = i_file.readline()
         while len(line) != 0:
@@ -198,8 +205,8 @@ def get_sz_idx(filename):
     return os.path.getsize(os.path.join("Merge", filename)) / 1024
 
 if __name__ == "__main__":
-    #build_index("DEV")
-    #merge_partial_indices()
+    build_index("DEV")
+    merge_partial_indices()
     convert_freq_to_norm_tf_idf("full_index.txt", "intermediate_full_index.txt", "final_full_index.txt")
     index_the_index("final_full_index.txt")
     print(f"Number of documents: {get_num_docs()}")

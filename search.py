@@ -93,7 +93,8 @@ def convert_str_to_postings2(postings_str):
     return postings
 
 def get_top_5_queries_from_docs_and_scores(docs_and_scores):
-    SCORE = 0 #maxes indexing cleaner
+    # get top 5 documents using heap
+    SCORE = 0 #makes indexing cleaner
     heap = [] #initialize empty heapq
     for docid, score in docs_and_scores.items():
         if len(heap)<5: # if there are not 5 element in heapq, just add them 
@@ -105,37 +106,40 @@ def get_top_5_queries_from_docs_and_scores(docs_and_scores):
     return heap
 
 def get_docs_and_scores(all_query_postings, query_norm_tf_idfs):
+    # compute score for any document that has at least one of the query tokens 
     docs_and_scores = {}
     for i in range(len(all_query_postings)):
         for posting in all_query_postings[i][1]:
-            imp_factor = 1 if posting[IMP] else (1/2)
+            imp_factor = 1 if posting[IMP] else (1/2) # give important words twice the weight
             if posting[DOCID] not in docs_and_scores:
                 docs_and_scores[posting[DOCID]] = posting[SCORE] * query_norm_tf_idfs[i] * imp_factor
             else:
                 docs_and_scores[posting[DOCID]] += posting[SCORE] * query_norm_tf_idfs[i] * imp_factor
-    return docs_and_scores
+    return docs_and_scores # return a map containing documents and their scores
 
 def serve_query(query_token_frequencies, index_file, index_for_index):
     all_query_postings = []
     query_tf_idfs = []
     query_leng_for_normalize = 0
+    #check if query exceeds 32 tokens (if it does only consider the longest 32 tokens in the query)
     if len(query_token_frequencies) <= 32:
         query_items = query_token_frequencies.items()
     else:
         query_items = sorted(list(query_token_frequencies.items()), key = lambda item: len(item[0]), reverse = True)[:32]
+    #go through each query token and find their postings, compute norm tf-idf for query using ltc
     for token, freq in query_items:
         if token in index_for_index:
             index_file.seek(index_for_index[token])
             line = index_file.readline().strip()
             term, postings = line.split(":")
-            postings = convert_str_to_postings2(postings)
+            postings = convert_str_to_postings2(postings) # turns string into postings list
             all_query_postings.append((term, postings))
             tf_idf = compute_tf_idf(freq, len(postings), lambda tf: 1+math.log10(tf), lambda df: math.log10(N/df)) #ltc #can consider limiting to terms with high idf only
             query_tf_idfs.append(tf_idf)
             query_leng_for_normalize += tf_idf ** 2
     query_leng_for_normalize = math.sqrt(query_leng_for_normalize)
     query_norm_tf_idfs = [tf_idf/query_leng_for_normalize for tf_idf in query_tf_idfs]
-    docs_and_scores = get_docs_and_scores(all_query_postings, query_norm_tf_idfs)
+    docs_and_scores = get_docs_and_scores(all_query_postings, query_norm_tf_idfs) #pass in query_postings and query normalized tf_idfs to get ranking
     result = get_top_5_queries_from_docs_and_scores(docs_and_scores)
     return result
 
@@ -152,8 +156,10 @@ def print_top_5(results, doc_id_url_map):
 if __name__ == "__main__":
     with open(os.path.join("Auxilary", "DocID_map.json"), "r") as file:
         doc_id_url_map = json.load(file)
+    # open doc_id_url_map to allow us to print urls from top 5 docids
     with open(os.path.join("Auxilary", "index_for_index.json"), "r") as file:
         index_for_index = json.load(file)
+    # open index_for_index so we can use to find terms that we need to look up in the index
     with open(os.path.join("Merge", "final_full_index.txt"), "r") as file:
         while True:
             query = input("Enter a query: ")
